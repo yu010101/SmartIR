@@ -1,0 +1,27 @@
+databases:
+  - name: smartir-db
+    databaseName: smartir
+    user: smartir
+    plan: free
+    region: singapore
+
+services:
+  - type: web
+    name: smartir-api
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartir-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://frontend-eta-smoky-41.vercel.app,http://localhost:3000
+      - key: APP_ENV
+        value: production
+    healthCheckPath: /health
