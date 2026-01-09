@@ -5,7 +5,7 @@ import { getAllStocks, getAllSectors } from "@/lib/public-api";
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://smartir-web-silk.vercel.app";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrls: MetadataRoute.Sitemap = [

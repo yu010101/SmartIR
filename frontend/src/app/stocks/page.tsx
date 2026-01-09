@@ -1,16 +1,36 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { getAllStocks, getAllSectors } from "@/lib/public-api";
+import { BreadcrumbData, ItemListData } from "@/components/StructuredData";
 import type { Company, SectorInfo } from "@/types";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://smartir-web-silk.vercel.app";
 
 export const metadata: Metadata = {
   title: "銘柄一覧 | AI-IR Insight - AIによるIR資料分析",
   description:
-    "上場企業のIR資料をAIが自動分析。決算短信、有価証券報告書の要約・センチメント分析で投資判断をサポート。",
+    "上場企業のIR資料をAIが自動分析。決算短信、有価証券報告書の要約・センチメント分析で投資判断をサポート。トヨタ、ソニー、任天堂など主要銘柄を網羅。",
+  keywords: ["株式", "IR", "決算", "銘柄一覧", "有価証券報告書", "決算短信", "AI分析", "投資"],
+  alternates: {
+    canonical: `${SITE_URL}/stocks`,
+  },
   openGraph: {
     title: "銘柄一覧 | AI-IR Insight",
     description: "上場企業のIR資料をAIが自動分析。決算短信、有価証券報告書の要約・センチメント分析。",
     type: "website",
+    url: `${SITE_URL}/stocks`,
+    images: [
+      {
+        url: `${SITE_URL}/api/og?title=${encodeURIComponent("銘柄一覧")}&subtitle=${encodeURIComponent("上場企業のIR資料をAI分析")}`,
+        width: 1200,
+        height: 630,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "銘柄一覧 | AI-IR Insight",
+    description: "上場企業のIR資料をAIが自動分析。投資判断をサポート。",
   },
 };
 
@@ -86,8 +106,24 @@ export default async function StocksPage() {
   const { stocks, total } = stocksData;
   const { sectors } = sectorsData;
 
+  // パンくずリスト
+  const breadcrumbs = [
+    { name: "ホーム", url: "/" },
+    { name: "銘柄一覧", url: "/stocks" },
+  ];
+
+  // 銘柄リスト（ItemList構造化データ用）
+  const stockListItems = stocks.slice(0, 50).map((stock, index) => ({
+    name: `${stock.name}（${stock.ticker_code}）`,
+    url: `/stocks/${stock.ticker_code}`,
+    position: index + 1,
+  }));
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      <BreadcrumbData items={breadcrumbs} />
+      <ItemListData items={stockListItems} name="銘柄一覧" />
+      <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* パンくずリスト */}
         <nav className="text-sm text-gray-500 mb-4">
@@ -123,5 +159,6 @@ export default async function StocksPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

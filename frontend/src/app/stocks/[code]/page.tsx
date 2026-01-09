@@ -6,8 +6,15 @@ import {
   getStockAnalysis,
   getAllTickerCodes,
 } from "@/lib/public-api";
-import { StructuredData } from "@/components/StructuredData";
+import {
+  BreadcrumbData,
+  StockStructuredData,
+  FAQData,
+  ArticleStructuredData,
+} from "@/components/StructuredData";
 import type { Document, StockAnalysis } from "@/types";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://smartir-web-silk.vercel.app";
 
 interface PageProps {
   params: Promise<{ code: string }>;
@@ -30,21 +37,46 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   try {
     const stock = await getStockByTicker(code);
 
-    const title = `${stock.name}（${stock.ticker_code}）の決算・IR情報 | AI-IR Insight`;
+    const title = `${stock.name}（${stock.ticker_code}）の決算・IR情報`;
     const description = `${stock.name}のIR資料をAIが分析。決算短信、有価証券報告書の要約と感情分析で投資判断をサポート。${stock.sector ? `業種: ${stock.sector}` : ""}`;
+    const ogImageUrl = `${SITE_URL}/api/og?title=${encodeURIComponent(stock.name)}&subtitle=${encodeURIComponent(stock.description || "決算・IR情報をAIが分析")}&ticker=${stock.ticker_code}`;
 
     return {
       title,
       description,
+      keywords: [
+        stock.name,
+        stock.ticker_code,
+        stock.sector || "",
+        stock.industry || "",
+        "決算",
+        "IR",
+        "有価証券報告書",
+        "決算短信",
+        "AI分析",
+      ].filter(Boolean),
+      alternates: {
+        canonical: `${SITE_URL}/stocks/${stock.ticker_code}`,
+      },
       openGraph: {
-        title,
+        title: `${title} | AI-IR Insight`,
         description,
-        type: "website",
+        type: "article",
+        url: `${SITE_URL}/stocks/${stock.ticker_code}`,
+        images: [
+          {
+            url: ogImageUrl,
+            width: 1200,
+            height: 630,
+            alt: `${stock.name}のIR情報`,
+          },
+        ],
       },
       twitter: {
-        card: "summary",
-        title,
+        card: "summary_large_image",
+        title: `${title} | AI-IR Insight`,
         description,
+        images: [ogImageUrl],
       },
     };
   } catch {
@@ -204,45 +236,51 @@ export default async function StockDetailPage({ params }: PageProps) {
 
   const analysis = await getStockAnalysis(code);
 
-  // 構造化データ
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: stock.name,
-    tickerSymbol: stock.ticker_code,
-    url: stock.website_url || undefined,
-    description: stock.description || `${stock.name}のIR情報`,
-  };
+  // パンくずリスト
+  const breadcrumbs = [
+    { name: "ホーム", url: "/" },
+    { name: "銘柄一覧", url: "/stocks" },
+    { name: stock.name, url: `/stocks/${stock.ticker_code}` },
+  ];
 
-  const breadcrumbData = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "ホーム",
-        item: process.env.NEXT_PUBLIC_SITE_URL || "https://example.com",
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "銘柄一覧",
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || "https://example.com"}/stocks`,
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: stock.name,
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || "https://example.com"}/stocks/${stock.ticker_code}`,
-      },
-    ],
-  };
+  // FAQ構造化データ（SEO強化）
+  const faqItems = [
+    {
+      question: `${stock.name}（${stock.ticker_code}）の決算情報は？`,
+      answer: analysis
+        ? analysis.summary
+        : `${stock.name}のIR資料を分析中です。最新の決算情報が公開され次第、AIが自動分析を行います。`,
+    },
+    {
+      question: `${stock.name}の業種は？`,
+      answer: `${stock.name}は${stock.sector || "未分類"}に属する企業です。${stock.industry ? `業界は${stock.industry}です。` : ""}`,
+    },
+    {
+      question: `${stock.name}のIR資料はどこで見れる？`,
+      answer: `${stock.name}のIR資料は当サイトで${stock.document_count}件公開されています。決算短信、有価証券報告書などをAIが分析し、要約とセンチメント分析を提供しています。`,
+    },
+  ];
 
   return (
     <>
-      <StructuredData data={structuredData} />
-      <StructuredData data={breadcrumbData} />
+      <StockStructuredData
+        tickerCode={stock.ticker_code}
+        name={stock.name}
+        description={stock.description || undefined}
+        sector={stock.sector || undefined}
+        industry={stock.industry || undefined}
+      />
+      <BreadcrumbData items={breadcrumbs} />
+      <FAQData items={faqItems} />
+      {analysis && (
+        <ArticleStructuredData
+          title={`${stock.name}のAI分析レポート`}
+          description={analysis.summary}
+          publishDate={analysis.publish_date}
+          modifiedDate={new Date(analysis.analyzed_at).toISOString().split("T")[0]}
+          url={`/stocks/${stock.ticker_code}`}
+        />
+      )}
 
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 py-8">
