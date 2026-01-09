@@ -33,4 +33,5 @@ class DocumentResponse(DocumentBase):
     updated_at: datetime
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+        use_enum_values = True 

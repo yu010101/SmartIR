@@ -68,6 +68,24 @@ def get_stock_by_ticker(ticker_code: str, db: Session = Depends(get_db)):
         .all()
     )
 
+    # ドキュメントのdoc_typeをstring値に変換
+    documents_data = [
+        {
+            "id": doc.id,
+            "company_id": doc.company_id,
+            "title": doc.title,
+            "doc_type": doc.doc_type.value if hasattr(doc.doc_type, 'value') else str(doc.doc_type),
+            "publish_date": doc.publish_date,
+            "source_url": doc.source_url,
+            "storage_url": doc.storage_url,
+            "is_processed": doc.is_processed,
+            "raw_text": doc.raw_text,
+            "created_at": doc.created_at,
+            "updated_at": doc.updated_at,
+        }
+        for doc in recent_documents
+    ]
+
     return StockDetailResponse(
         id=company.id,
         name=company.name,
@@ -78,12 +96,12 @@ def get_stock_by_ticker(ticker_code: str, db: Session = Depends(get_db)):
         website_url=company.website_url,
         created_at=company.created_at,
         updated_at=company.updated_at,
-        recent_documents=recent_documents,
+        recent_documents=documents_data,
         document_count=db.query(Document).filter(Document.company_id == company.id).count()
     )
 
 
-@router.get("/stocks/{ticker_code}/documents", response_model=List[DocumentResponse])
+@router.get("/stocks/{ticker_code}/documents")
 def get_stock_documents(
     ticker_code: str,
     skip: int = Query(0, ge=0),
@@ -106,7 +124,23 @@ def get_stock_documents(
         .all()
     )
 
-    return documents
+    # ドキュメントのdoc_typeをstring値に変換
+    return [
+        {
+            "id": doc.id,
+            "company_id": doc.company_id,
+            "title": doc.title,
+            "doc_type": doc.doc_type.value if hasattr(doc.doc_type, 'value') else str(doc.doc_type),
+            "publish_date": doc.publish_date,
+            "source_url": doc.source_url,
+            "storage_url": doc.storage_url,
+            "is_processed": doc.is_processed,
+            "raw_text": doc.raw_text,
+            "created_at": doc.created_at,
+            "updated_at": doc.updated_at,
+        }
+        for doc in documents
+    ]
 
 
 @router.get("/stocks/{ticker_code}/analysis", response_model=Optional[StockAnalysisResponse])
