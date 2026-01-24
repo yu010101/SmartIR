@@ -11,7 +11,7 @@ from datetime import datetime
 from enum import Enum
 
 from app.core.database import get_db
-from app.api.auth import get_current_user
+from app.core.deps import get_current_active_user
 from app.models.user import User
 from app.models.notification import NotificationSettings, NotificationLog, NotificationChannel
 from app.services.notification_service import notification_service
@@ -132,7 +132,7 @@ class NotificationLogResponse(BaseModel):
 async def save_notification_settings(
     settings_data: NotificationSettingsCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     通知設定を保存
@@ -166,7 +166,7 @@ async def save_notification_settings(
 @router.get("/settings", response_model=Optional[NotificationSettingsResponse])
 async def get_notification_settings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     通知設定を取得
@@ -187,7 +187,7 @@ async def get_notification_settings(
 async def send_test_notification(
     request: TestNotificationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     テスト通知を送信
@@ -254,7 +254,7 @@ async def send_test_notification(
 async def get_notification_logs(
     limit: int = 50,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     通知ログを取得
@@ -279,7 +279,7 @@ async def get_notification_logs(
 @router.delete("/settings", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_notification_settings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     通知設定を削除
