@@ -9,9 +9,11 @@ logger = logging.getLogger(__name__)
 
 class LLMAnalyzer:
     """LLMを使用してテキストを要約・分析するクラス"""
-    
+
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        self.client = OpenAI(api_key=api_key) if api_key else None
+        self.enabled = api_key is not None
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=2000,
             chunk_overlap=200,
@@ -41,14 +43,18 @@ class LLMAnalyzer:
     def analyze(self, text: str, doc_type: str) -> Optional[Dict[str, Any]]:
         """
         テキストを要約・分析
-        
+
         Args:
             text (str): 分析対象のテキスト
             doc_type (str): 文書タイプ
-            
+
         Returns:
             Optional[Dict[str, Any]]: 分析結果
         """
+        if not self.enabled:
+            logger.warning("LLM Analyzer is disabled (OPENAI_API_KEY not set)")
+            return None
+
         try:
             # テキストを分割
             chunks = self.text_splitter.split_text(text)
