@@ -32,7 +32,7 @@ jobs:
   morning:
     if: >-
       github.event.schedule == '0 0 * * 1-5' ||
-      (github.event_name == 'workflow_dispatch' && inputs.job == 'morning')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'morning')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -74,7 +74,7 @@ jobs:
   evening:
     if: >-
       github.event.schedule == '0 11 * * *' ||
-      (github.event_name == 'workflow_dispatch' && inputs.job == 'evening')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'evening')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -126,7 +126,7 @@ jobs:
   weekly:
     if: >-
       github.event.schedule == '0 1 * * 0' ||
-      (github.event_name == 'workflow_dispatch' && inputs.job == 'weekly')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'weekly')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
