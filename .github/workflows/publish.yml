@@ -26,13 +26,8 @@ env:
   PYTHONPATH: ${{ github.workspace }}
 
 jobs:
-  # ──────────────────────────────────────────────
-  # Morning: Publish breaking articles for new IR documents
-  # ──────────────────────────────────────────────
   morning:
-    if: >-
-      github.event.schedule == '0 0 * * 1-5' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'morning')
+    if: github.event.schedule == '0 0 * * 1-5' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'morning')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -68,13 +63,8 @@ jobs:
         run: python scripts/run_morning_tweet.py
         continue-on-error: true
 
-  # ──────────────────────────────────────────────
-  # Evening: Daily summary article + tweet
-  # ──────────────────────────────────────────────
   evening:
-    if: >-
-      github.event.schedule == '0 11 * * *' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'evening')
+    if: github.event.schedule == '0 11 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'evening')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -120,13 +110,8 @@ jobs:
           fi
         continue-on-error: true
 
-  # ──────────────────────────────────────────────
-  # Weekly: Trend report + tweet (Sunday)
-  # ──────────────────────────────────────────────
   weekly:
-    if: >-
-      github.event.schedule == '0 1 * * 0' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'weekly')
+    if: github.event.schedule == '0 1 * * 0' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'weekly')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
