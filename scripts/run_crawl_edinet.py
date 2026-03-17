@@ -19,11 +19,23 @@ logger = logging.getLogger(__name__)
 def save_crawl_results(results: list, db) -> int:
     saved_count = 0
     for result in results:
-        company = db.query(Company).filter(
-            Company.ticker_code == result.get("company_code")
-        ).first()
-        if not company:
+        company_code = result.get("company_code")
+        if not company_code:
             continue
+
+        company = db.query(Company).filter(
+            Company.ticker_code == company_code
+        ).first()
+
+        # 企業が未登録の場合は自動作成
+        if not company:
+            company = Company(
+                ticker_code=company_code,
+                name=result.get("filer_name") or f"企業{company_code}",
+            )
+            db.add(company)
+            db.flush()
+            logger.info(f"New company registered: {company_code} - {company.name}")
 
         existing = db.query(Document).filter(
             Document.source_url == result.get("source_url")

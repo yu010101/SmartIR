@@ -8,13 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 class EDINETCrawler(BaseCrawler):
-    """EDINETクローラー（有価証券報告書等を取得）"""
+    """EDINETクローラー（有価証券報告書等を取得）- EDINET API v2対応"""
 
     def __init__(self):
         super().__init__()
         self.base_url = os.getenv(
             "EDINET_API_URL",
-            "https://disclosure.edinet-fsa.go.jp/api/v1/"
+            "https://api.edinet-fsa.go.jp/api/v2/"
         )
         self.api_key = os.getenv("EDINET_API_KEY", "")
 
@@ -78,7 +78,7 @@ class EDINETCrawler(BaseCrawler):
         return results
 
     def _get_documents_list(self, date: str) -> List[Dict[str, Any]]:
-        """指定日の書類一覧を取得"""
+        """指定日の書類一覧を取得（EDINET API v2）"""
         url = f"{self.base_url}documents.json"
         params = {
             "date": date,
@@ -88,7 +88,7 @@ class EDINETCrawler(BaseCrawler):
         if self.api_key:
             params["Subscription-Key"] = self.api_key
 
-        response = self._get(url)
+        response = self._get(url, params=params)
         data = response.json()
 
         if data.get("metadata", {}).get("status") != "200":
@@ -98,8 +98,9 @@ class EDINETCrawler(BaseCrawler):
         return data.get("results", [])
 
     def _get_document_url(self, doc_id: str) -> str:
-        """書類のダウンロードURLを生成"""
-        return f"{self.base_url}documents/{doc_id}?type=1"
+        """書類のダウンロードURLを生成（v2）"""
+        key_param = f"&Subscription-Key={self.api_key}" if self.api_key else ""
+        return f"{self.base_url}documents/{doc_id}?type=1{key_param}"
 
     def _determine_doc_type(self, doc_type_code: str) -> str:
         """書類タイプコードから資料種別を判定"""

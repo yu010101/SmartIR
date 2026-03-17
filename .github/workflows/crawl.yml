@@ -45,6 +45,7 @@ jobs:
       - run: python scripts/run_crawl_edinet.py 1
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
 
   crawl-companies:
     if: >-
