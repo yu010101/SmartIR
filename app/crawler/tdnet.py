@@ -92,7 +92,7 @@ class TDNetCrawler(BaseCrawler):
                 # TDnetの行構造: 時刻 | コード | 会社名 | タイトル（PDFリンク）
                 time_cell = cells[0].get_text(strip=True)
                 code_cell = cells[1].get_text(strip=True)
-                # company_name = cells[2].get_text(strip=True)
+                company_name = cells[2].get_text(strip=True)
                 title_cell = cells[3]
 
                 # 証券コードの抽出（4-5桁の数字）
@@ -120,6 +120,7 @@ class TDNetCrawler(BaseCrawler):
 
                 result = {
                     "company_code": company_code,
+                    "filer_name": company_name,
                     "title": title,
                     "publish_date": publish_date,
                     "doc_type": self._determine_doc_type(title),
