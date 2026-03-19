@@ -345,51 +345,62 @@ class NoteClient:
                 pass
 
     async def _set_eyecatch(self, page, eyecatch_path: str) -> None:
-        """Set the eyecatch (OGP) image on the publish settings page.
+        """Set the eyecatch (OGP) image on the editor page.
 
-        Tries multiple approaches:
-        1. Standard file input
-        2. CDP-based file chooser (for hidden inputs)
-        3. Label-based discovery
+        The eyecatch button (aria-label='画像を追加') is on the edit page,
+        not the publish settings page. Clicks it to trigger a file chooser.
         """
-        await self._dismiss_modals(page)
-
+        # Try to find the button BEFORE dismissing modals (modals can hide it)
         try:
-            # Approach 1: Direct file input
-            file_input = await page.query_selector('input[type="file"]')
+            eyecatch_btn = await page.query_selector('button[aria-label="画像を追加"]')
 
-            # Approach 2: Try finding via label
-            if not file_input:
-                labels = await page.query_selector_all("label")
-                for label in labels:
-                    text = (await label.text_content() or "").strip()
-                    if "見出し画像" in text or "アイキャッチ" in text or "画像" in text:
-                        file_input = await label.query_selector('input[type="file"]')
-                        if file_input:
-                            break
-
-            if file_input:
-                await file_input.set_input_files(eyecatch_path)
-                await asyncio.sleep(3)
-                log.info("Eyecatch image set: %s", eyecatch_path)
-                # Dismiss any crop/edit modal that may appear
+            if not eyecatch_btn:
                 await self._dismiss_modals(page)
-            else:
-                # Approach 3: CDP file chooser for dynamically created inputs
-                try:
-                    eyecatch_btn = await page.query_selector('[class*="eyecatch"], [class*="thumbnail"]')
-                    if eyecatch_btn:
-                        async with page.expect_file_chooser(timeout=5000) as fc_info:
-                            await eyecatch_btn.click()
-                        file_chooser = await fc_info.value
-                        await file_chooser.set_files(eyecatch_path)
-                        await asyncio.sleep(3)
-                        log.info("Eyecatch image set via file chooser: %s", eyecatch_path)
-                        await self._dismiss_modals(page)
+                await asyncio.sleep(2)
+                eyecatch_btn = await page.query_selector('button[aria-label="画像を追加"]')
+
+            if eyecatch_btn:
+                # Step 1: Click the eyecatch button to open dropdown menu
+                await eyecatch_btn.click()
+                await asyncio.sleep(1)
+
+                # Step 2: Click "画像をアップロード" in the dropdown, which triggers file chooser
+                async with page.expect_file_chooser(timeout=10000) as fc_info:
+                    upload_btn = page.get_by_text("画像をアップロード").first
+                    await upload_btn.click()
+                file_chooser = await fc_info.value
+                await file_chooser.set_files(eyecatch_path)
+                await asyncio.sleep(3)
+                log.info("Eyecatch image uploaded: %s", eyecatch_path)
+
+                # After upload, CropModal appears — find and click confirm inside it
+                crop_modal = await page.query_selector('.ReactModalPortal')
+                if crop_modal:
+                    for selector in [
+                        '.ReactModalPortal button:has-text("適用")',
+                        '.ReactModalPortal button:has-text("完了")',
+                        '.ReactModalPortal button:has-text("決定")',
+                        '.ReactModalPortal button:has-text("保存")',
+                        '.ReactModalPortal button:has-text("OK")',
+                    ]:
+                        confirm_btn = await page.query_selector(selector)
+                        if confirm_btn:
+                            await confirm_btn.click(force=True)
+                            log.info("Eyecatch crop confirmed via: %s", selector)
+                            await asyncio.sleep(3)
+                            break
                     else:
-                        log.warning("Eyecatch file input not found")
-                except Exception as e2:
-                    log.warning("CDP file chooser also failed: %s", e2)
+                        # If no known button found, try clicking any primary button in modal
+                        modal_buttons = await page.query_selector_all('.ReactModalPortal button')
+                        for btn in modal_buttons:
+                            text = (await btn.text_content() or "").strip()
+                            if text and text not in ("キャンセル", "閉じる", "✕", "×"):
+                                await btn.click(force=True)
+                                log.info("Eyecatch crop confirmed via modal button: %s", text)
+                                await asyncio.sleep(3)
+                                break
+            else:
+                log.warning("Eyecatch button not found on page")
         except Exception as e:
             log.warning("Failed to set eyecatch image: %s", e)
 
@@ -451,8 +462,18 @@ class NoteClient:
 
                 page.on("response", on_response)
 
-                # コンテンツはAPI経由で保存済みなので、直接publish設定ページへ遷移
-                # /publish/ ページには「投稿する」ボタンがある
+                # アイキャッチはeditページでのみ設定可能
+                if eyecatch_path:
+                    edit_url = f"{NOTE_EDITOR_BASE}/notes/{draft_key}/edit/"
+                    log.info("Opening editor for eyecatch: %s", edit_url)
+                    await page.goto(edit_url)
+                    await asyncio.sleep(5)
+                    await page.wait_for_load_state("networkidle")
+                    await asyncio.sleep(2)
+                    # Do NOT dismiss modals before eyecatch — it can remove the button
+                    await self._set_eyecatch(page, eyecatch_path)
+
+                # publish設定ページへ遷移
                 log.info("Navigating to publish settings: %s", publish_settings_url)
                 await page.goto(publish_settings_url)
                 await asyncio.sleep(3)
@@ -463,9 +484,6 @@ class NoteClient:
                 for _ in range(3):
                     await self._dismiss_modals(page)
                     await asyncio.sleep(1)
-
-                if eyecatch_path:
-                    await self._set_eyecatch(page, eyecatch_path)
 
                 if hashtags:
                     await self._set_hashtags(page, hashtags)
