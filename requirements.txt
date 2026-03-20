@@ -54,6 +54,9 @@ google-auth-httplib2>=0.1.1
 # Scheduler
 apscheduler>=3.10.0
 
+# OBS WebSocket Control
+obsws-python>=1.7.0
+
 # PDF Table Extraction (Vision)
 pdf2image>=1.16.0
 

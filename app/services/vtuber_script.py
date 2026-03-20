@@ -1,6 +1,5 @@
 from typing import Dict, Any, Optional, List
 import os
-from openai import OpenAI
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -15,9 +14,27 @@ class VTuberScriptGenerator:
     """AIVtuber用の台本を生成するクラス"""
 
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
-        self.client = OpenAI(api_key=api_key) if api_key else None
-        self.enabled = api_key is not None
+        self.anthropic_client = None
+        self.openai_client = None
+        self.provider = None
+
+        # Anthropic Claude を優先
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+
+        if anthropic_key:
+            import anthropic
+            self.anthropic_client = anthropic.Anthropic(api_key=anthropic_key)
+            self.provider = "anthropic"
+        if openai_key:
+            from openai import OpenAI
+            self.openai_client = OpenAI(api_key=openai_key)
+            if not self.provider:
+                self.provider = "openai"
+
+        self.enabled = self.provider is not None
+        # OpenAI互換の client プロパティ（既存コードとの後方互換）
+        self.client = self.openai_client
 
         # キャラクター設定（イリスの詳細プロフィール）
         self.character_profile = """
@@ -50,6 +67,30 @@ class VTuberScriptGenerator:
         「イリスの分析は参考情報です。投資判断はご自身の責任でお願いします。」
         """
     
+    def _call_llm(self, system: str, user: str, temperature: float = 0.7) -> str:
+        """LLM呼び出し（Anthropic優先、OpenAIフォールバック）"""
+        if self.provider == "anthropic" and self.anthropic_client:
+            response = self.anthropic_client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                temperature=temperature,
+            )
+            return response.content[0].text
+        elif self.openai_client:
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=temperature,
+            )
+            return response.choices[0].message.content
+        else:
+            raise RuntimeError("No LLM provider available")
+
     def generate_script(self, analysis_result: Dict[str, Any], company_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         分析結果から配信用の台本を生成
@@ -62,7 +103,7 @@ class VTuberScriptGenerator:
             Optional[Dict[str, Any]]: 生成した台本
         """
         if not self.enabled:
-            logger.warning("VTuber Script Generator is disabled (OPENAI_API_KEY not set)")
+            logger.warning("VTuber Script Generator is disabled (no API key set)")
             return None
 
         try:
@@ -82,7 +123,7 @@ class VTuberScriptGenerator:
             要約: {analysis_result["summary"]}
             重要ポイント:
             {chr(10).join(analysis_result["key_points"])}
-            
+
             センチメント:
             ポジティブ: {analysis_result["sentiment"]["positive"]}
             ネガティブ: {analysis_result["sentiment"]["negative"]}
@@ -101,17 +142,8 @@ class VTuberScriptGenerator:
             - 具体的な投資アドバイスは避ける
             - 適度に擬人化や例えを使用
             """
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "あなたはVTuber向けの台本作家です。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-            
-            script = response.choices[0].message.content
+
+            script = self._call_llm("あなたはVTuber向けの台本作家です。", prompt)
             
             # 台本に感情表現や演出指示を追加
             enriched_script = self._add_performance_notes(script)
@@ -136,21 +168,12 @@ class VTuberScriptGenerator:
         - (真剣な表情で)
         - (手振りを交えながら)
         - (画面に図を表示しながら)
-        
+
         台本:
         {script}
         """
-        
-        response = self.client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {"role": "system", "content": "あなたはVTuber向けの台本作家です。"},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content
+
+        return self._call_llm("あなたはVTuber向けの台本作家です。", prompt)
 
     async def generate_morning_market_script(
         self,
@@ -209,16 +232,7 @@ class VTuberScriptGenerator:
             - 最後に免責表現を入れる
             """
 
-            response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "あなたはVTuber向けの台本作家です。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-
-            script = response.choices[0].message.content
+            script = self._call_llm("あなたはVTuber向けの台本作家です。", prompt)
             enriched_script = self._add_performance_notes(script)
 
             return {
@@ -287,16 +301,7 @@ class VTuberScriptGenerator:
             - 最後に免責表現を入れる
             """
 
-            response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "あなたはVTuber向けの台本作家です。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-
-            script = response.choices[0].message.content
+            script = self._call_llm("あなたはVTuber向けの台本作家です。", prompt)
             enriched_script = self._add_performance_notes(script)
 
             return {
@@ -366,16 +371,7 @@ class VTuberScriptGenerator:
             - 最後に免責表現を入れる
             """
 
-            response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "あなたはVTuber向けの台本作家です。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-
-            script = response.choices[0].message.content
+            script = self._call_llm("あなたはVTuber向けの台本作家です。", prompt)
             enriched_script = self._add_performance_notes(script)
 
             return {
@@ -458,16 +454,7 @@ class VTuberScriptGenerator:
             - 最後に免責表現を入れる
             """
 
-            response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "あなたはVTuber向けの台本作家です。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-
-            script = response.choices[0].message.content
+            script = self._call_llm("あなたはVTuber向けの台本作家です。", prompt)
             enriched_script = self._add_performance_notes(script)
 
             return {
@@ -552,16 +539,7 @@ class VTuberScriptGenerator:
             - 最後に免責表現を入れる
             """
 
-            response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "あなたはVTuber向けの台本作家です。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-
-            script = response.choices[0].message.content
+            script = self._call_llm("あなたはVTuber向けの台本作家です。", prompt)
             enriched_script = self._add_performance_notes(script)
 
             return {
@@ -649,16 +627,7 @@ class VTuberScriptGenerator:
             - 最後に免責表現を入れる
             """
 
-            response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "あなたはVTuber向けの台本作家です。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-
-            script = response.choices[0].message.content
+            script = self._call_llm("あなたはVTuber向けの台本作家です。", prompt)
             enriched_script = self._add_performance_notes(script)
 
             return {
